@@ -1,3 +1,25 @@
+# Python
 __pycache__/
-*.pyc
+*.py[cod]
+*.egg-info/
+dist/
+build/
+
+# Virtual environment
+venv/
+.venv/
+
+# IDE
+.vscode/
+.idea/
+
+# Testing
 .pytest_cache/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Superpowers (brainstorm session data)
+.superpowers/brainstorm/*/state/
+.superpowers/brainstorm/*/content/
