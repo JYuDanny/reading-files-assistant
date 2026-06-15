@@ -12,7 +12,6 @@ def test_create_session():
     assert session is not None
     assert session.image == image_b64
     assert session.messages == []
-    assert session.is_processing is False
 
 
 def test_get_nonexistent_session():

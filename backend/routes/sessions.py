@@ -118,6 +118,18 @@ async def stream_response(session_id: str):
     )
 
 
+@router.get("/sessions/{session_id}")
+async def get_session(session_id: str):
+    session = session_manager.get(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="会话不存在或已过期")
+    return {
+        "session_id": session.id,
+        "has_image": bool(session.image),
+        "message_count": len(session.messages),
+    }
+
+
 @router.get("/health")
 async def health_check():
     lm_ok = llm_client.health_check()

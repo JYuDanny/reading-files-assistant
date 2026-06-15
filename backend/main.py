@@ -3,6 +3,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from backend.config import settings
 from backend.routes.sessions import router as sessions_router
+from backend.routes.pages import router as pages_router
 from backend.llm_client import llm_client
 
 
@@ -25,3 +26,4 @@ app.add_middleware(
 )
 
 app.include_router(sessions_router)
+app.include_router(pages_router)
