@@ -32,7 +32,7 @@ class LLMClient:
         self.model = settings.lm_studio_model
         self.timeout = settings.llm_timeout_seconds
 
-    def _build_request(self, messages: list, max_tokens: int = 512,
+    def _build_request(self, messages: list, max_tokens: int = 2048,
                        temperature: float = 0.7, stream: bool = False) -> dict:
         return {
             "model": self.model,
@@ -42,7 +42,7 @@ class LLMClient:
             "stream": stream,
         }
 
-    async def chat(self, messages: list, max_tokens: int = 512,
+    async def chat(self, messages: list, max_tokens: int = 2048,
                    temperature: float = 0.7) -> str:
         async with httpx.AsyncClient(proxy=None, timeout=self.timeout) as client:
             resp = await client.post(
@@ -60,7 +60,7 @@ class LLMClient:
                 raise RuntimeError(f"LM Studio returned empty content: {data}")
             return content
 
-    async def chat_stream(self, messages: list, max_tokens: int = 512,
+    async def chat_stream(self, messages: list, max_tokens: int = 2048,
                           temperature: float = 0.7):
         async with httpx.AsyncClient(proxy=None, timeout=self.timeout) as client:
             async with client.stream(

@@ -118,6 +118,7 @@ function startStreaming() {
   currentBubble = null;
   document.getElementById('status').textContent = '回复中...';
   document.getElementById('status').style.color = '#f9e2af';
+let tokenCount = 0;
   const es = new EventSource(`/api/sessions/${SESSION_ID}/stream`);
   es.onmessage = (event) => {
     if (event.data === '[DONE]') {
@@ -128,6 +129,11 @@ function startStreaming() {
       document.getElementById('input').focus();
       document.getElementById('status').textContent = '就绪';
       document.getElementById('status').style.color = '#a6e3a1';
+      // 最终渲染一次完整 Markdown
+      if (currentBubble) {
+        const bubble = currentBubble.querySelector('.bubble');
+        bubble.innerHTML = marked.parse(bubble.textContent);
+      }
       return;
     }
     try {
@@ -141,7 +147,11 @@ function startStreaming() {
         if (!currentBubble) { currentBubble = addMessage('assistant', ''); }
         const bubble = currentBubble.querySelector('.bubble');
         bubble.textContent += data.delta;
-        bubble.innerHTML = marked.parse(bubble.textContent);
+        tokenCount++;
+        // 每 8 个 token 渲染一次，避免每次 token 都 O(n^2) 重解析
+        if (tokenCount % 8 === 0) {
+          bubble.innerHTML = marked.parse(bubble.textContent);
+        }
       }
     } catch(e) {}
   };
@@ -160,6 +170,22 @@ function startStreaming() {
 document.getElementById('input').addEventListener('keydown', (e) => {
   if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
 });
+
+// 加载截图预览
+fetch(`/api/sessions/${SESSION_ID}`)
+  .then(r => r.json())
+  .then(data => {
+    if (data.image) {
+      document.getElementById('preview-img').src = data.image;
+      document.getElementById('preview').classList.remove('collapsed');
+    }
+    document.getElementById('status').textContent = '就绪';
+    document.getElementById('status').style.color = '#a6e3a1';
+  })
+  .catch(() => {
+    document.getElementById('status').textContent = '就绪';
+    document.getElementById('status').style.color = '#a6e3a1';
+  });
 
 startStreaming();
 </script>

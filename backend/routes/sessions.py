@@ -90,7 +90,7 @@ async def stream_response(session_id: str):
                     messages.append(msg)
 
             full_content = ""
-            async for token in llm_client.chat_stream(messages):
+            async for token in llm_client.chat_stream(messages, max_tokens=2048):
                 full_content += token
                 yield f"data: {json.dumps({'delta': token})}\n\n"
                 await asyncio.sleep(0)
@@ -125,9 +125,19 @@ async def get_session(session_id: str):
         raise HTTPException(status_code=404, detail="会话不存在或已过期")
     return {
         "session_id": session.id,
-        "has_image": bool(session.image),
+        "image": session.image,
         "message_count": len(session.messages),
     }
+
+
+@router.get("/sessions/{session_id}/image")
+async def get_session_image(session_id: str):
+    session = session_manager.get(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="会话不存在或已过期")
+    if not session.image:
+        raise HTTPException(status_code=404, detail="截图不存在")
+    return {"image": session.image}
 
 
 @router.get("/health")
