@@ -57,7 +57,11 @@ async def stream_response(session_id: str):
     if not session:
         raise HTTPException(status_code=404, detail="会话不存在或已过期")
 
+    if not session_manager.try_acquire_processing(session_id):
+        raise HTTPException(status_code=429, detail="请等待当前回复完成")
+
     async def event_generator():
+        initial_prompt_sent = False
         try:
             if not session.messages:
                 initial_prompt = "请详细描述这张截图的内容，帮助我理解。"
@@ -71,13 +75,14 @@ async def stream_response(session_id: str):
                     }
                 ]
                 session_manager.add_message(session_id, "user", initial_prompt)
+                initial_prompt_sent = True
             else:
                 messages = []
                 first_msg = session.messages[0]
                 messages.append({
                     "role": "user",
                     "content": [
-                        {"type": "text", "text": first_msg["content"]},
+                        {"type": "text", "text": first_msg.get("content", "")},
                         {"type": "image_url", "image_url": {"url": session.image}},
                     ]
                 })
@@ -95,10 +100,12 @@ async def stream_response(session_id: str):
 
         except Exception as e:
             error_msg = str(e)
-            if "503" in error_msg or "Connection refused" in error_msg:
+            if "Connection refused" in error_msg or "ConnectError" in error_msg:
                 error_msg = "LM Studio 服务未启动或无法连接"
             yield f"data: {json.dumps({'error': error_msg})}\n\n"
             yield "data: [DONE]\n\n"
+        finally:
+            session_manager.release_processing(session_id)
 
     return StreamingResponse(
         event_generator(),
