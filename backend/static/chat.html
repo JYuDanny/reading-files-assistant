@@ -57,10 +57,6 @@ body { font-family: system-ui, -apple-system, sans-serif; height: 100vh; display
   </div>
 </div>
 <div class="messages" id="messages">
-  <div class="message assistant">
-    <div class="avatar">🤖</div>
-    <div class="bubble">正在分析截图...</div>
-  </div>
 </div>
 <div class="input-area">
   <textarea id="input" placeholder="输入你的追问..." rows="1"></textarea>
@@ -186,8 +182,6 @@ fetch(`/api/sessions/${SESSION_ID}`)
     document.getElementById('status').textContent = '就绪';
     document.getElementById('status').style.color = '#a6e3a1';
   });
-
-startStreaming();
 </script>
 </body>
 </html>

@@ -61,33 +61,23 @@ async def stream_response(session_id: str):
         raise HTTPException(status_code=429, detail="请等待当前回复完成")
 
     async def event_generator():
-        initial_prompt_sent = False
         try:
             if not session.messages:
-                initial_prompt = "请详细描述这张截图的内容，帮助我理解。"
-                messages = [
-                    {
-                        "role": "user",
-                        "content": [
-                            {"type": "text", "text": initial_prompt},
-                            {"type": "image_url", "image_url": {"url": session.image}},
-                        ]
-                    }
+                yield f"data: {json.dumps({'error': '请先发送一条消息'})}\n\n"
+                yield "data: [DONE]\n\n"
+                return
+
+            messages = []
+            first_msg = session.messages[0]
+            messages.append({
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": first_msg.get("content", "")},
+                    {"type": "image_url", "image_url": {"url": session.image}},
                 ]
-                session_manager.add_message(session_id, "user", initial_prompt)
-                initial_prompt_sent = True
-            else:
-                messages = []
-                first_msg = session.messages[0]
-                messages.append({
-                    "role": "user",
-                    "content": [
-                        {"type": "text", "text": first_msg.get("content", "")},
-                        {"type": "image_url", "image_url": {"url": session.image}},
-                    ]
-                })
-                for msg in session.messages[1:]:
-                    messages.append(msg)
+            })
+            for msg in session.messages[1:]:
+                messages.append(msg)
 
             full_content = ""
             async for token in llm_client.chat_stream(messages, max_tokens=2048):
