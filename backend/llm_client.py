@@ -89,18 +89,8 @@ class LLMClient:
         except Exception:
             return False
 
-    def warmup(self):
-        import asyncio
-
-        async def _warmup():
-            await self.chat([{"role": "user", "content": "ping"}], max_tokens=1)
-
-        try:
-            asyncio.get_event_loop().run_until_complete(_warmup())
-        except RuntimeError:
-            import nest_asyncio
-            nest_asyncio.apply()
-            asyncio.get_event_loop().run_until_complete(_warmup())
+    async def warmup(self):
+        await self.chat([{"role": "user", "content": "ping"}], max_tokens=1)
 
 
 llm_client = LLMClient()

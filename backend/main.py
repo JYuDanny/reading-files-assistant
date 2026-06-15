@@ -19,7 +19,7 @@ async def cleanup_task():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     try:
-        llm_client.warmup()
+        await llm_client.warmup()
     except Exception:
         pass
     cleanup_coro = asyncio.create_task(cleanup_task())

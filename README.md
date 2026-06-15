@@ -17,6 +17,7 @@
 - **LM Studio** (最新版, 用于本地运行多模态模型)
 - **Chrome 浏览器** (用于加载扩展)
 - **Git** (用于版本管理)
+- 支持 **Windows** / **macOS** / **Linux**
 
 ## 快速开始
 
@@ -29,10 +30,17 @@ cd reading-files-assistant
 
 ### 2. 创建虚拟环境并安装依赖
 
+**Windows (PowerShell):**
 ```powershell
-# Windows PowerShell
 python -m venv venv
 .\venv\Scripts\activate
+pip install -r requirements.txt
+```
+
+**macOS / Linux:**
+```bash
+python3 -m venv venv
+source venv/bin/activate
 pip install -r requirements.txt
 ```
 
@@ -41,17 +49,23 @@ pip install -r requirements.txt
 1. 打开 LM Studio
 2. 搜索并下载模型：`qwen/qwen3-vl-4b`（或其他兼容的多模态模型）
 3. 加载模型后，进入 **Developer** → **Start Server**
-4. 确认端口为 `1234`，状态显示为运行中
+4. 确认端口为 `1234`
 
 验证 LM Studio 服务：
 
+**Windows:**
 ```powershell
 Invoke-RestMethod -Uri "http://localhost:1234/v1/models" -Method Get
 ```
 
+**macOS / Linux:**
+```bash
+curl http://localhost:1234/v1/models
+```
+
 ### 4. 启动后端
 
-```powershell
+```bash
 uvicorn backend.main:app --reload
 ```
 
@@ -59,8 +73,8 @@ uvicorn backend.main:app --reload
 
 验证后端：
 
-```powershell
-Invoke-RestMethod -Uri "http://localhost:8000/api/health" -Method Get
+```bash
+curl http://localhost:8000/api/health
 ```
 
 ### 5. 加载 Chrome 扩展
@@ -69,15 +83,36 @@ Invoke-RestMethod -Uri "http://localhost:8000/api/health" -Method Get
 2. 开启右上角 **开发者模式**
 3. 点击 **加载已解压的扩展程序**
 4. 选择项目中的 `extension/` 目录
-5. 确认扩展出现在列表中，快捷键设置为 `Ctrl+Shift+X`
+5. 确认扩展出现在列表中
+
+快捷键：
+- **Windows**: `Ctrl+Shift+X`
+- **macOS**: `Command+Shift+X`
 
 ### 6. 开始使用
 
 1. 打开任意网页（如技术文档、论文等）
-2. 按 `Ctrl+Shift+X`，鼠标框选感兴趣的内容区域
+2. 按快捷键，鼠标框选感兴趣的内容区域
 3. 点击 **确认截图**
-4. 自动打开聊天面板，多模态模型开始分析截图
-5. 在输入框中追问，支持多轮对话
+4. 自动打开聊天面板，在输入框发送你的问题
+5. 支持多轮追问
+
+## 迁移到其他机器
+
+项目已发布在 GitHub，在任何新机器上使用只需三步：
+
+```bash
+# 1. 克隆代码
+git clone https://github.com/JYuDanny/reading-files-assistant.git
+cd reading-files-assistant
+
+# 2. 创建虚拟环境并安装依赖（参考上方对应系统的命令）
+
+# 3. 在 LM Studio 中加载 qwen3-vl-4b 并启动 Server，然后启动后端
+uvicorn backend.main:app --reload
+```
+
+代码完全跨平台——所有路径使用 `pathlib`，无硬编码的 Windows 路径，无系统特定依赖。Chrome 扩展的 manifest 已同时配置 Windows 和 macOS 快捷键。
 
 ## 项目结构
 
@@ -129,6 +164,7 @@ reading-files-assistant/
 | `MAX_REQUEST_SIZE_MB` | `10` | 截图大小上限 |
 | `SESSION_TIMEOUT_MINUTES` | `30` | 会话超时时间 |
 | `LLM_TIMEOUT_SECONDS` | `120` | LLM 请求超时 |
+| `LLM_MAX_TOKENS` | `-1` | 最大输出 token（-1 不限） |
 
 ## 运行测试
 
