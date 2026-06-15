@@ -1,0 +1,85 @@
+import os
+import base64
+import json
+import mimetypes
+import httpx
+
+os.environ["NO_PROXY"] = "localhost,127.0.0.1,::1"
+os.environ["no_proxy"] = "localhost,127.0.0.1,::1"
+
+from backend.config import settings
+
+
+def image_to_base64(image_source: str) -> str:
+    if image_source.startswith(("http://", "https://")):
+        with httpx.Client(proxy=None, timeout=30) as c:
+            resp = c.get(image_source)
+            resp.raise_for_status()
+            content_type = resp.headers.get("content-type", "image/png")
+            raw_bytes = resp.content
+    else:
+        mime, _ = mimetypes.guess_type(image_source)
+        content_type = mime or "image/png"
+        with open(image_source, "rb") as f:
+            raw_bytes = f.read()
+
+    b64 = base64.b64encode(raw_bytes).decode("utf-8")
+    return f"data:{content_type};base64,{b64}"
+
+
+class LLMClient:
+    def __init__(self):
+        self.base_url = settings.lm_studio_base_url
+        self.model = settings.lm_studio_model
+        self.timeout = settings.llm_timeout_seconds
+
+    def _build_request(self, messages: list, max_tokens: int = 512,
+                       temperature: float = 0.7, stream: bool = False) -> dict:
+        return {
+            "model": self.model,
+            "messages": messages,
+            "max_tokens": max_tokens,
+            "temperature": temperature,
+            "stream": stream,
+        }
+
+    def chat(self, messages: list, max_tokens: int = 512,
+             temperature: float = 0.7) -> str:
+        with httpx.Client(proxy=None, timeout=self.timeout) as client:
+            resp = client.post(
+                f"{self.base_url}/chat/completions",
+                json=self._build_request(messages, max_tokens, temperature),
+            )
+            if resp.status_code != 200:
+                raise RuntimeError(f"HTTP {resp.status_code}: {resp.text[:500]}")
+            return resp.json()["choices"][0]["message"]["content"]
+
+    def chat_stream(self, messages: list, max_tokens: int = 512,
+                    temperature: float = 0.7):
+        with httpx.Client(proxy=None, timeout=self.timeout) as client:
+            with client.stream(
+                "POST",
+                f"{self.base_url}/chat/completions",
+                json=self._build_request(messages, max_tokens, temperature, stream=True),
+            ) as resp:
+                resp.raise_for_status()
+                for line in resp.iter_lines():
+                    if line.startswith("data: ") and line != "data: [DONE]":
+                        chunk = json.loads(line[6:])
+                        delta = chunk["choices"][0].get("delta", {})
+                        if "content" in delta and delta["content"]:
+                            yield delta["content"]
+
+    def health_check(self) -> bool:
+        try:
+            with httpx.Client(proxy=None, timeout=5) as client:
+                resp = client.get(f"{self.base_url}/models")
+                return resp.status_code == 200
+        except Exception:
+            return False
+
+    def warmup(self):
+        self.chat([{"role": "user", "content": "ping"}], max_tokens=1)
+
+
+llm_client = LLMClient()
