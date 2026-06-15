@@ -20,3 +20,11 @@ def test_settings_override_from_env(monkeypatch):
     assert settings.host == "0.0.0.0"
     assert settings.port == 9000
     assert settings.lm_studio_base_url == "http://localhost:9999/v1"
+
+
+def test_settings_singleton():
+    import backend.config
+    from backend.config import settings, Settings
+    assert isinstance(settings, Settings)
+    import backend.config as bc2
+    assert bc2.settings is settings
