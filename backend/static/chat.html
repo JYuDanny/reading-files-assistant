@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>阅读助手</title>
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body { font-family: system-ui, -apple-system, sans-serif; height: 100vh; display: flex; flex-direction: column; background: #1e1e2e; color: #cdd6f4; }
@@ -40,6 +43,9 @@ body { font-family: system-ui, -apple-system, sans-serif; height: 100vh; display
 .message:hover .copy-btn { opacity: 1; }
 .copy-btn:hover { background: #45475a; color: #cdd6f4; }
 .copy-btn.copied { color: #a6e3a1; border-color: #a6e3a1; }
+/* KaTeX dark theme overrides */
+.katex { color: #cdd6f4; }
+.katex-display { overflow-x: auto; overflow-y: hidden; }
 .typing { color: #6c7086; font-style: italic; padding: 10px 14px; }
 .input-area { padding: 12px 16px; background: #181825; border-top: 1px solid #313244; display: flex; gap: 8px; }
 .input-area textarea { flex: 1; padding: 10px 14px; background: #313244; color: #cdd6f4; border: 1px solid #45475a; border-radius: 8px; font-size: 14px; font-family: inherit; resize: none; height: 44px; outline: none; }
@@ -106,6 +112,17 @@ function copyMessage(btn) {
   });
 }
 
+function renderContent(el, rawText) {
+  el.innerHTML = marked.parse(rawText);
+  renderMathInElement(el, {
+    delimiters: [
+      {left: '$$', right: '$$', display: true},
+      {left: '$', right: '$', display: false},
+    ],
+    throwOnError: false
+  });
+}
+
 function sendMessage() {
   const input = document.getElementById('input');
   const content = input.value.trim();
@@ -151,7 +168,7 @@ function startStreaming() {
       document.getElementById('status').style.color = '#a6e3a1';
       if (currentBubble) {
         currentBubble._rawText = rawMarkdown;
-        currentBubble.querySelector('.bubble').innerHTML = marked.parse(rawMarkdown);
+        renderContent(currentBubble.querySelector('.bubble'), rawMarkdown);
       }
       return;
     }
@@ -168,7 +185,7 @@ function startStreaming() {
         currentBubble._rawText = rawMarkdown;
         tokenCount++;
         if (tokenCount % 8 === 0) {
-          currentBubble.querySelector('.bubble').innerHTML = marked.parse(rawMarkdown);
+          renderContent(currentBubble.querySelector('.bubble'), rawMarkdown);
         }
       }
     } catch(e) {}
