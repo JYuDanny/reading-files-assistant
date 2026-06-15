@@ -1,0 +1,25 @@
+{
+  "manifest_version": 3,
+  "name": "阅读助手",
+  "version": "1.0.0",
+  "description": "框选页面内容截图，通过本地多模态大模型辅助阅读理解",
+  "permissions": ["activeTab", "scripting"],
+  "host_permissions": ["http://localhost:8000/*"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "commands": {
+    "capture-screenshot": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+X",
+        "mac": "Command+Shift+X"
+      },
+      "description": "框选截图并发送到阅读助手"
+    }
+  },
+  "icons": {
+    "16": "icon.png",
+    "48": "icon.png",
+    "128": "icon.png"
+  }
+}
