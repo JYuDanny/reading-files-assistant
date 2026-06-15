@@ -35,7 +35,7 @@ async def test_session_info_endpoint(client):
     assert resp.status_code == 200
     data = resp.json()
     assert data["session_id"] == sid
-    assert data["has_image"] is True
+    assert data["image"] is not None
     assert data["message_count"] == 0
 
 

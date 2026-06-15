@@ -16,6 +16,7 @@ class Settings:
     max_request_size_mb: int
     session_timeout_minutes: int
     llm_timeout_seconds: int
+    llm_max_tokens: int
 
     def __init__(self) -> None:
         self.host = os.environ.get("HOST", "127.0.0.1")
@@ -29,6 +30,7 @@ class Settings:
         self.max_request_size_mb = _int_env("MAX_REQUEST_SIZE_MB", 10)
         self.session_timeout_minutes = _int_env("SESSION_TIMEOUT_MINUTES", 30)
         self.llm_timeout_seconds = _int_env("LLM_TIMEOUT_SECONDS", 120)
+        self.llm_max_tokens = _int_env("LLM_MAX_TOKENS", -1)
 
 
 settings = Settings()

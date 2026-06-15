@@ -112,9 +112,10 @@ function sendMessage() {
 function startStreaming() {
   streamDone = false;
   currentBubble = null;
+  let rawMarkdown = '';
+  let tokenCount = 0;
   document.getElementById('status').textContent = '回复中...';
   document.getElementById('status').style.color = '#f9e2af';
-let tokenCount = 0;
   const es = new EventSource(`/api/sessions/${SESSION_ID}/stream`);
   es.onmessage = (event) => {
     if (event.data === '[DONE]') {
@@ -125,10 +126,8 @@ let tokenCount = 0;
       document.getElementById('input').focus();
       document.getElementById('status').textContent = '就绪';
       document.getElementById('status').style.color = '#a6e3a1';
-      // 最终渲染一次完整 Markdown
       if (currentBubble) {
-        const bubble = currentBubble.querySelector('.bubble');
-        bubble.innerHTML = marked.parse(bubble.textContent);
+        currentBubble.querySelector('.bubble').innerHTML = marked.parse(rawMarkdown);
       }
       return;
     }
@@ -141,12 +140,10 @@ let tokenCount = 0;
       }
       if (data.delta) {
         if (!currentBubble) { currentBubble = addMessage('assistant', ''); }
-        const bubble = currentBubble.querySelector('.bubble');
-        bubble.textContent += data.delta;
+        rawMarkdown += data.delta;
         tokenCount++;
-        // 每 8 个 token 渲染一次，避免每次 token 都 O(n^2) 重解析
         if (tokenCount % 8 === 0) {
-          bubble.innerHTML = marked.parse(bubble.textContent);
+          currentBubble.querySelector('.bubble').innerHTML = marked.parse(rawMarkdown);
         }
       }
     } catch(e) {}

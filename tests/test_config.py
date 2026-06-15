@@ -10,6 +10,7 @@ def test_default_settings():
     assert settings.max_request_size_mb == 10
     assert settings.session_timeout_minutes == 30
     assert settings.llm_timeout_seconds == 120
+    assert settings.llm_max_tokens == -1
 
 
 def test_settings_override_from_env(monkeypatch):

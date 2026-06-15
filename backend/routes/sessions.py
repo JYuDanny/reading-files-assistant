@@ -80,7 +80,7 @@ async def stream_response(session_id: str):
                 messages.append(msg)
 
             full_content = ""
-            async for token in llm_client.chat_stream(messages, max_tokens=2048):
+            async for token in llm_client.chat_stream(messages):
                 full_content += token
                 yield f"data: {json.dumps({'delta': token})}\n\n"
                 await asyncio.sleep(0)
