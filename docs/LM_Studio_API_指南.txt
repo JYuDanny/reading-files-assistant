@@ -1,0 +1,364 @@
+================================================================================
+        本地 LM Studio 多模态大模型接口调用指南
+        （qwen/qwen3-vl-4b  /  OpenAI 兼容接口）
+================================================================================
+
+环境信息
+--------
+- 系统: Windows
+- LM Studio 版本: 最新版, 监听端口 1234
+- 模型: qwen/qwen3-vl-4b (多模态视觉语言模型)
+- 接口格式: OpenAI 兼容 (/v1/chat/completions)
+- Python: 3.9+, 依赖 httpx
+
+
+================================================================================
+一、准备工作
+================================================================================
+
+1.1 确保 LM Studio 已启动, 指定端口加载模型:
+
+    LM Studio → Developer → Start Server
+    端口: 1234
+    模型: qwen/qwen3-vl-4b
+
+1.2 验证服务可用 (PowerShell):
+
+    Invoke-RestMethod -Uri "http://localhost:1234/v1/models" -Method Get
+
+    预期输出包含:
+      { "id": "qwen/qwen3-vl-4b", "object": "model", ... }
+
+1.3 Python 依赖安装:
+
+    pip install httpx
+
+    (不需要安装 openai SDK, 直接用 httpx 更稳定)
+
+
+================================================================================
+二、关键问题及解决方案
+================================================================================
+
+⚠️ 问题 1: 503 Service Unavailable (代理拦截)
+─────────────────────────────────────────────────
+根因:
+  系统中的 VPN/代理软件 (如 Veee) 会在操作系统层面拦截 Python 的 HTTP 
+  流量，将请求路由到代理端口 (如 15236) 而非 LM Studio 的 1234 端口。
+
+  注意: httpx 和 urllib 都会自动检测并使用系统代理，PowerShell 的 
+  Invoke-RestMethod 不受影响，这就是为什么用 PowerShell 测试能通但 
+  Python 脚本不行。
+
+解决方案 (在脚本开头添加):
+
+    import os
+    os.environ["NO_PROXY"] = "localhost,127.0.0.1,::1"
+    os.environ["no_proxy"] = "localhost,127.0.0.1,::1"
+
+    同时创建 httpx.Client 时必须显式设置 proxy=None:
+        httpx.Client(proxy=None, timeout=120)
+
+
+⚠️ 问题 2: 图片 URL 返回 400 (不支持直接传 URL)
+─────────────────────────────────────────────────
+错误信息:
+  {"error":"'url' field must be a base64 encoded image."}
+
+根因:
+  LM Studio 底层使用 llama.cpp, 其 vision 接口只接受 base64 编码的图片,
+  不接受原始 HTTP URL (这与 OpenAI 原生 API 不同)。
+
+解决方案:
+  先将图片下载并转为 base64 data URI 格式:
+    data:image/png;base64,iVBORw0KGgo...
+
+  注意: 本地图片也需要读文件后 base64 编码, 不能直接传文件路径。
+
+
+================================================================================
+三、完整调用代码
+================================================================================
+
+以下代码可直接用于生产环境:
+
+---- 复制以下全部内容到你的 Python 文件 ----
+
+import os
+import base64
+import httpx
+
+# ===== 绕过系统代理 =====
+os.environ["NO_PROXY"] = "localhost,127.0.0.1,::1"
+os.environ["no_proxy"] = "localhost,127.0.0.1,::1"
+
+BASE_URL = "http://localhost:1234/v1"
+MODEL = "qwen/qwen3-vl-4b"
+
+
+def image_url_to_base64(image_source: str) -> str:
+    """
+    将图片转为 LM Studio 可接受的 base64 data URI。
+
+    参数:
+        image_source: 可以是:
+            - HTTP/HTTPS URL (网络图片)
+            - 本地文件路径 (如 "C:\\images\\photo.jpg")
+
+    返回:
+        data:image/<mime>;base64,<数据>
+    """
+    if image_source.startswith(("http://", "https://")):
+        # 网络图片: 先下载
+        with httpx.Client(proxy=None, timeout=30) as c:
+            resp = c.get(image_source)
+            resp.raise_for_status()
+            content_type = resp.headers.get("content-type", "image/png")
+            raw_bytes = resp.content
+    else:
+        # 本地图片: 读文件
+        import mimetypes
+        mime, _ = mimetypes.guess_type(image_source)
+        content_type = mime or "image/png"
+        with open(image_source, "rb") as f:
+            raw_bytes = f.read()
+
+    b64 = base64.b64encode(raw_bytes).decode("utf-8")
+    return f"data:{content_type};base64,{b64}"
+
+
+def chat(messages: list, max_tokens: int = 512, temperature: float = 0.7) -> str:
+    """
+    调用 LM Studio 本地多模态大模型。
+
+    参数:
+        messages:   消息列表, 格式与 OpenAI API 一致
+        max_tokens: 最大输出 token 数
+        temperature: 随机性 (0=确定, 1=创意)
+
+    返回:
+        模型的文本回复
+    """
+    with httpx.Client(proxy=None, timeout=120) as client:
+        resp = client.post(
+            f"{BASE_URL}/chat/completions",
+            json={
+                "model": MODEL,
+                "messages": messages,
+                "max_tokens": max_tokens,
+                "temperature": temperature,
+            },
+        )
+        if resp.status_code != 200:
+            raise RuntimeError(f"HTTP {resp.status_code}: {resp.text[:500]}")
+        return resp.json()["choices"][0]["message"]["content"]
+
+
+# ============================================================
+# 使用示例
+# ============================================================
+
+if __name__ == "__main__":
+
+    # --- 示例 1: 纯文本对话 ---
+    print("=== 纯文本对话 ===")
+    reply = chat([
+        {"role": "user", "content": "你好, 用一句话介绍你自己。"}
+    ])
+    print(reply)
+    print()
+
+    # --- 示例 2: 多模态 (图片理解) ---
+    print("=== 多模态理解 ===")
+    # 方式 A: 网络图片 URL
+    img_base64 = image_url_to_base64(
+        "https://example.com/photo.png"
+    )
+    # 方式 B: 本地图片
+    # img_base64 = image_url_to_base64(r"C:\Users\xxx\Pictures\photo.jpg")
+
+    reply = chat([
+        {
+            "role": "user",
+            "content": [
+                {"type": "text", "text": "这张图片里有什么？请详细描述。"},
+                {"type": "image_url", "image_url": {"url": img_base64}},
+            ],
+        }
+    ])
+    print(reply)
+
+---- 复制结束 ----
+
+
+================================================================================
+四、messages 格式详解
+================================================================================
+
+4.1 纯文本消息:
+
+    {"role": "user", "content": "你好"}
+
+4.2 单图片 + 文本:
+
+    {
+        "role": "user",
+        "content": [
+            {"type": "text",     "text": "请描述这张图片"},
+            {"type": "image_url", "image_url": {"url": "data:image/png;base64,..."}}
+        ]
+    }
+
+4.3 多图片 + 文本:
+
+    {
+        "role": "user",
+        "content": [
+            {"type": "text",     "text": "对比这两张图片"},
+            {"type": "image_url", "image_url": {"url": "data:image/png;base64,A..."}},
+            {"type": "image_url", "image_url": {"url": "data:image/png;base64,B..."}}
+        ]
+    }
+
+4.4 多轮对话:
+
+    [
+        {"role": "user",      "content": "图里是什么动物？"},
+        {"role": "assistant", "content": "这是一只猫。"},
+        {"role": "user",      "content": "它是什么颜色的？"}
+    ]
+
+注意: 多轮对话中, 只有包含图片的那一轮需要 image_url 字段, 
+后续轮次可以直接文本追问。
+
+
+================================================================================
+五、API 参数说明
+================================================================================
+
+端点:  POST /v1/chat/completions
+
+请求体:
+  model          (必填) 模型 ID, 必须是 /v1/models 中列出的 id
+  messages       (必填) 消息数组, 见第四章格式
+  max_tokens     (可选) 最大生成 token 数, 默认 512, -1 表示不限
+  temperature    (可选) 0.0~2.0, 越高越随机
+  top_p          (可选) 核采样阈值, 0~1
+  stop           (可选) 停止词, 字符串或数组
+  stream         (可选) true/false, 是否流式输出
+
+响应体:
+  {
+    "id": "chatcmpl-...",
+    "object": "chat.completion",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "模型的回复文本"
+        },
+        "finish_reason": "stop"   // stop | length | null
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 100,
+      "completion_tokens": 50,
+      "total_tokens": 150
+    }
+  }
+
+
+================================================================================
+六、流式输出 (streaming)
+================================================================================
+
+def chat_stream(messages: list, **kwargs):
+    """流式调用, 逐 token 输出"""
+    with httpx.Client(proxy=None, timeout=120) as client:
+        with client.stream(
+            "POST",
+            f"{BASE_URL}/chat/completions",
+            json={
+                "model": MODEL,
+                "messages": messages,
+                "stream": True,
+                **kwargs,
+            },
+        ) as resp:
+            resp.raise_for_status()
+            for line in resp.iter_lines():
+                if line.startswith("data: ") and line != "data: [DONE]":
+                    chunk = json.loads(line[6:])
+                    delta = chunk["choices"][0].get("delta", {})
+                    content = delta.get("content", "")
+                    if content:
+                        print(content, end="", flush=True)
+    print()
+
+
+================================================================================
+七、常见错误排查
+================================================================================
+
+┌─────────────────────────┬──────────────────────────────────────┐
+│ 错误                     │ 原因 & 解决                          │
+├─────────────────────────┼──────────────────────────────────────┤
+│ HTTP 503                 │ 代理拦截: 设置 NO_PROXY 环境变量     │
+│                          │ 或关闭 VPN/代理软件的 HTTP 代理功能  │
+├─────────────────────────┼──────────────────────────────────────┤
+│ Connection refused       │ LM Studio 未启动或端口不对           │
+│                          │ 检查 Developer 面板的端口号          │
+├─────────────────────────┼──────────────────────────────────────┤
+│ HTTP 400 url must be     │ 图片必须用 base64 编码, 不能传 URL   │
+│ base64 encoded image     │ 使用 image_url_to_base64() 转换      │
+├─────────────────────────┼──────────────────────────────────────┤
+│ model not found / 404    │ 模型 ID 写错了, 检查 /v1/models      │
+├─────────────────────────┼──────────────────────────────────────┤
+│ 超时 / 无响应            │ 第一轮推理可能较慢 (模型加载),       │
+│                          │ 增加 timeout 或先发一个简单请求预热   │
+├─────────────────────────┼──────────────────────────────────────┤
+│ UnicodeEncodeError       │ Windows 终端 GBK 编码问题, 不影响    │
+│ (gbk)                    │ 实际调用, 设置 PYTHONIOENCODING=utf-8 │
+└─────────────────────────┴──────────────────────────────────────┘
+
+
+================================================================================
+八、高级用法
+================================================================================
+
+8.1 直接使用 openai SDK (需额外处理)
+
+如果必须使用 openai SDK 而非 httpx:
+
+    from openai import OpenAI
+
+    client = OpenAI(
+        base_url="http://localhost:1234/v1",
+        api_key="lm-studio",
+        # 关键: 设置 httpx 客户端禁用代理
+        http_client=httpx.Client(proxy=None, timeout=120),
+    )
+
+但注意: openai SDK 的 models.list() 可能因分页机制与 LM Studio 
+不兼容而报 503, 建议跳过该步骤直接调用 chat.completions.create()。
+
+8.2 模型预热
+
+首次调用多模态模型时推理可能很慢 (几十秒), 因为需要加载视觉编码器。
+建议在应用启动时发一个简单的预热请求:
+
+    chat([{"role": "user", "content": "ping"}], max_tokens=1)
+
+
+================================================================================
+九、参考链接
+================================================================================
+
+- LM Studio 文档: https://lmstudio.ai/docs
+- OpenAI API 参考: https://platform.openai.com/docs/api-reference/chat
+- Qwen-VL 模型: https://huggingface.co/Qwen
+
+
+================================================================================
+生成时间: 2026-06-11
