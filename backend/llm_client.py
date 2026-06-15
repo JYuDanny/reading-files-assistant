@@ -4,9 +4,6 @@ import json
 import mimetypes
 import httpx
 
-os.environ["NO_PROXY"] = "localhost,127.0.0.1,::1"
-os.environ["no_proxy"] = "localhost,127.0.0.1,::1"
-
 from backend.config import settings
 
 
@@ -29,7 +26,9 @@ def image_to_base64(image_source: str) -> str:
 
 class LLMClient:
     def __init__(self):
-        self.base_url = settings.lm_studio_base_url
+        os.environ.setdefault("NO_PROXY", "localhost,127.0.0.1,::1")
+        os.environ.setdefault("no_proxy", "localhost,127.0.0.1,::1")
+        self.base_url = settings.lm_studio_base_url.rstrip("/")
         self.model = settings.lm_studio_model
         self.timeout = settings.llm_timeout_seconds
 
@@ -50,9 +49,16 @@ class LLMClient:
                 f"{self.base_url}/chat/completions",
                 json=self._build_request(messages, max_tokens, temperature),
             )
-            if resp.status_code != 200:
-                raise RuntimeError(f"HTTP {resp.status_code}: {resp.text[:500]}")
-            return resp.json()["choices"][0]["message"]["content"]
+            resp.raise_for_status()
+            data = resp.json()
+            choices = data.get("choices", [])
+            if not choices:
+                raise RuntimeError(f"LM Studio returned no choices: {data}")
+            message = choices[0].get("message", {})
+            content = message.get("content", "")
+            if not content:
+                raise RuntimeError(f"LM Studio returned empty content: {data}")
+            return content
 
     def chat_stream(self, messages: list, max_tokens: int = 512,
                     temperature: float = 0.7):
@@ -65,7 +71,10 @@ class LLMClient:
                 resp.raise_for_status()
                 for line in resp.iter_lines():
                     if line.startswith("data: ") and line != "data: [DONE]":
-                        chunk = json.loads(line[6:])
+                        try:
+                            chunk = json.loads(line[6:])
+                        except json.JSONDecodeError:
+                            continue
                         delta = chunk["choices"][0].get("delta", {})
                         if "content" in delta and delta["content"]:
                             yield delta["content"]

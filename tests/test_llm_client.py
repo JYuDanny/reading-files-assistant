@@ -24,5 +24,8 @@ def test_image_to_base64_from_local_file():
 
 
 def test_no_proxy_env_set():
-    assert os.environ.get("no_proxy", "").find("localhost") >= 0 or \
-           os.environ.get("NO_PROXY", "").find("localhost") >= 0
+    from backend.llm_client import LLMClient
+    client = LLMClient()
+    no_proxy = os.environ.get("no_proxy", "") + os.environ.get("NO_PROXY", "")
+    assert "localhost" in no_proxy
+    assert "127.0.0.1" in no_proxy
