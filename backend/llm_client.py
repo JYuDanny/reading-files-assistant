@@ -42,10 +42,10 @@ class LLMClient:
             "stream": stream,
         }
 
-    def chat(self, messages: list, max_tokens: int = 512,
-             temperature: float = 0.7) -> str:
-        with httpx.Client(proxy=None, timeout=self.timeout) as client:
-            resp = client.post(
+    async def chat(self, messages: list, max_tokens: int = 512,
+                   temperature: float = 0.7) -> str:
+        async with httpx.AsyncClient(proxy=None, timeout=self.timeout) as client:
+            resp = await client.post(
                 f"{self.base_url}/chat/completions",
                 json=self._build_request(messages, max_tokens, temperature),
             )
@@ -60,16 +60,16 @@ class LLMClient:
                 raise RuntimeError(f"LM Studio returned empty content: {data}")
             return content
 
-    def chat_stream(self, messages: list, max_tokens: int = 512,
-                    temperature: float = 0.7):
-        with httpx.Client(proxy=None, timeout=self.timeout) as client:
-            with client.stream(
+    async def chat_stream(self, messages: list, max_tokens: int = 512,
+                          temperature: float = 0.7):
+        async with httpx.AsyncClient(proxy=None, timeout=self.timeout) as client:
+            async with client.stream(
                 "POST",
                 f"{self.base_url}/chat/completions",
                 json=self._build_request(messages, max_tokens, temperature, stream=True),
             ) as resp:
                 resp.raise_for_status()
-                for line in resp.iter_lines():
+                async for line in resp.aiter_lines():
                     if line.startswith("data: ") and line != "data: [DONE]":
                         try:
                             chunk = json.loads(line[6:])
@@ -79,16 +79,26 @@ class LLMClient:
                         if "content" in delta and delta["content"]:
                             yield delta["content"]
 
-    def health_check(self) -> bool:
+    async def health_check(self) -> bool:
         try:
-            with httpx.Client(proxy=None, timeout=5) as client:
-                resp = client.get(f"{self.base_url}/models")
+            async with httpx.AsyncClient(proxy=None, timeout=5) as client:
+                resp = await client.get(f"{self.base_url}/models")
                 return resp.status_code == 200
         except Exception:
             return False
 
     def warmup(self):
-        self.chat([{"role": "user", "content": "ping"}], max_tokens=1)
+        import asyncio
+
+        async def _warmup():
+            await self.chat([{"role": "user", "content": "ping"}], max_tokens=1)
+
+        try:
+            asyncio.get_event_loop().run_until_complete(_warmup())
+        except RuntimeError:
+            import nest_asyncio
+            nest_asyncio.apply()
+            asyncio.get_event_loop().run_until_complete(_warmup())
 
 
 llm_client = LLMClient()

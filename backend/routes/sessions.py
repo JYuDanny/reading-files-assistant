@@ -24,7 +24,7 @@ class SendMessageRequest(BaseModel):
 
 @router.post("/sessions", response_model=CreateSessionResponse)
 async def create_session(req: CreateSessionRequest, request: Request):
-    if not llm_client.health_check():
+    if not await llm_client.health_check():
         raise HTTPException(
             status_code=503,
             detail="LM Studio 服务未启动，请确认已加载 qwen3-vl-4b 模型"
@@ -90,7 +90,7 @@ async def stream_response(session_id: str):
                     messages.append(msg)
 
             full_content = ""
-            for token in llm_client.chat_stream(messages):
+            async for token in llm_client.chat_stream(messages):
                 full_content += token
                 yield f"data: {json.dumps({'delta': token})}\n\n"
                 await asyncio.sleep(0)
@@ -132,7 +132,7 @@ async def get_session(session_id: str):
 
 @router.get("/health")
 async def health_check():
-    lm_ok = llm_client.health_check()
+    lm_ok = await llm_client.health_check()
     return {
         "status": "ok",
         "lm_studio": "connected" if lm_ok else "disconnected"
