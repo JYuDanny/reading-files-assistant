@@ -110,7 +110,10 @@ class LLMClient:
             return False
 
     async def warmup(self):
-        await self.chat([{"role": "user", "content": "ping"}], max_tokens=1)
+        try:
+            await self.chat([{"role": "user", "content": "ping"}], max_tokens=10)
+        except Exception:
+            pass
 
 
 llm_client = LLMClient()
