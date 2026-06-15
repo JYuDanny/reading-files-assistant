@@ -1,3 +1,5 @@
+import traceback
+
 from contextlib import asynccontextmanager
 import asyncio
 from fastapi import FastAPI, Request
@@ -19,9 +21,10 @@ async def cleanup_task():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     try:
+        await llm_client.detect_model()
         await llm_client.warmup()
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"[启动] 模型初始化失败: {e}")
     cleanup_coro = asyncio.create_task(cleanup_task())
     yield
     cleanup_coro.cancel()

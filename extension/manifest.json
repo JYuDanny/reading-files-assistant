@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "description": "框选页面内容截图，通过本地多模态大模型辅助阅读理解",
   "permissions": ["activeTab", "scripting"],
-  "host_permissions": ["http://localhost:8000/*"],
+  "host_permissions": ["http://localhost:8420/*"],
   "background": {
     "service_worker": "background.js"
   },

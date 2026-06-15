@@ -32,6 +32,26 @@ class LLMClient:
         self.model = settings.lm_studio_model
         self.timeout = settings.llm_timeout_seconds
 
+    async def detect_model(self):
+        """Auto-detect model from LM Studio if not explicitly configured."""
+        if self.model:
+            return
+        try:
+            async with httpx.AsyncClient(proxy=None, timeout=5) as client:
+                resp = await client.get(f"{self.base_url}/models")
+                resp.raise_for_status()
+                data = resp.json()
+                models = data.get("data", [])
+                if models:
+                    self.model = models[0].get("id", "")
+        except Exception:
+            pass
+        if not self.model:
+            raise RuntimeError(
+                "无法自动检测模型。请在 LM Studio 中加载模型并启动 Server，"
+                "或通过 LM_STUDIO_MODEL 环境变量指定模型 ID。"
+            )
+
     def _build_request(self, messages: list, max_tokens: int = None,
                        temperature: float = 0.7, stream: bool = False) -> dict:
         if max_tokens is None:
