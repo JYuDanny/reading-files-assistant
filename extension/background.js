@@ -28,14 +28,14 @@ chrome.commands.onCommand.addListener(async (command) => {
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === 'capture_area') {
-    handleCaptureArea(message.rect, sender.tab.id).then(sendResponse);
+    handleCaptureArea(message.rect, sender.tab.windowId).then(sendResponse);
     return true;
   }
 });
 
-async function handleCaptureArea(rect, tabId) {
+async function handleCaptureArea(rect, windowId) {
   try {
-    const dataUrl = await chrome.tabs.captureVisibleTab(tabId, {
+    const dataUrl = await chrome.tabs.captureVisibleTab(windowId, {
       format: 'png'
     });
 
