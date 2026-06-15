@@ -1,4 +1,7 @@
+import json
+import asyncio
 from fastapi import APIRouter, HTTPException, Request
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from backend.session_manager import session_manager
 from backend.llm_client import llm_client
@@ -46,6 +49,66 @@ async def send_message(session_id: str, req: SendMessageRequest):
         session_manager.add_message(session_id, "user", req.content)
     finally:
         session_manager.release_processing(session_id)
+
+
+@router.get("/sessions/{session_id}/stream")
+async def stream_response(session_id: str):
+    session = session_manager.get(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="会话不存在或已过期")
+
+    async def event_generator():
+        try:
+            if not session.messages:
+                initial_prompt = "请详细描述这张截图的内容，帮助我理解。"
+                messages = [
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": initial_prompt},
+                            {"type": "image_url", "image_url": {"url": session.image}},
+                        ]
+                    }
+                ]
+                session_manager.add_message(session_id, "user", initial_prompt)
+            else:
+                messages = []
+                first_msg = session.messages[0]
+                messages.append({
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": first_msg["content"]},
+                        {"type": "image_url", "image_url": {"url": session.image}},
+                    ]
+                })
+                for msg in session.messages[1:]:
+                    messages.append(msg)
+
+            full_content = ""
+            for token in llm_client.chat_stream(messages):
+                full_content += token
+                yield f"data: {json.dumps({'delta': token})}\n\n"
+                await asyncio.sleep(0)
+
+            session_manager.add_message(session_id, "assistant", full_content)
+            yield "data: [DONE]\n\n"
+
+        except Exception as e:
+            error_msg = str(e)
+            if "503" in error_msg or "Connection refused" in error_msg:
+                error_msg = "LM Studio 服务未启动或无法连接"
+            yield f"data: {json.dumps({'error': error_msg})}\n\n"
+            yield "data: [DONE]\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        }
+    )
 
 
 @router.get("/health")
