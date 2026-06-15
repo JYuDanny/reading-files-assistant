@@ -114,22 +114,23 @@ function copyMessage(btn) {
 function renderContent(el, rawText) {
   // 保护数学公式不被 marked.js 破坏（_ ^ 等会被误解析为 Markdown 语法）
   var mathBlocks = [];
+  var placeholder = 'MATHPLACEHOLDER';
   var protected_ = rawText
     .replace(/\\\[([\s\S]*?)\\\]/g, function(_, math) {
       mathBlocks.push({ display: true, math: math });
-      return '\x00MATH' + (mathBlocks.length - 1) + '\x00';
+      return placeholder + (mathBlocks.length - 1) + 'PLACEHOLDER';
     })
     .replace(/\\\(([\s\S]*?)\\\)/g, function(_, math) {
       mathBlocks.push({ display: false, math: math });
-      return '\x00MATH' + (mathBlocks.length - 1) + '\x00';
+      return placeholder + (mathBlocks.length - 1) + 'PLACEHOLDER';
     })
     .replace(/\$\$([\s\S]*?)\$\$/g, function(_, math) {
       mathBlocks.push({ display: true, math: math });
-      return '\x00MATH' + (mathBlocks.length - 1) + '\x00';
+      return placeholder + (mathBlocks.length - 1) + 'PLACEHOLDER';
     })
     .replace(/\$([^\n]*?)\$/g, function(_, math) {
       mathBlocks.push({ display: false, math: math });
-      return '\x00MATH' + (mathBlocks.length - 1) + '\x00';
+      return placeholder + (mathBlocks.length - 1) + 'PLACEHOLDER';
     });
 
   el.innerHTML = marked.parse(protected_);
@@ -146,7 +147,7 @@ function renderContent(el, rawText) {
     } catch (e) {
       rendered = '<code>' + mathBlocks[i].math + '</code>';
     }
-    html = html.replace('\x00MATH' + i + '\x00', rendered);
+    html = html.replace(placeholder + i + 'PLACEHOLDER', rendered);
   }
   el.innerHTML = html;
 }
