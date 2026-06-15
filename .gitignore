@@ -20,6 +20,5 @@ venv/
 .DS_Store
 Thumbs.db
 
-# Superpowers (brainstorm session data)
-.superpowers/brainstorm/*/state/
-.superpowers/brainstorm/*/content/
+# Dev tools (brainstorm session data)
+.superpowers/
