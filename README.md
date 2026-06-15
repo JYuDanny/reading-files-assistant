@@ -68,7 +68,7 @@ curl http://localhost:1234/v1/models
 ### 4. 启动后端
 
 ```bash
-uvicorn backend.main:app --reload
+python run.py
 ```
 
 服务默认运行在 `http://localhost:8420`。
@@ -111,7 +111,7 @@ cd reading-files-assistant
 # 2. 创建虚拟环境并安装依赖（参考上方对应系统的命令）
 
 # 3. 在 LM Studio 中加载模型并启动 Server，然后启动后端
-uvicorn backend.main:app --reload
+python run.py
 ```
 
 代码完全跨平台——所有路径使用 `pathlib`，无硬编码的 Windows 路径，无系统特定依赖。Chrome 扩展的 manifest 已同时配置 Windows 和 macOS 快捷键。
@@ -136,6 +136,7 @@ reading-files-assistant/
 │   ├── content.js             # 页面注入脚本（框选交互）
 │   ├── content.css            # 框选样式
 │   └── icon.png               # 扩展图标
+├── run.py                     # 启动入口
 ├── tests/                     # 25 个单元测试
 ├── docs/                      # 设计文档和实现计划
 ├── requirements.txt           # Python 依赖
